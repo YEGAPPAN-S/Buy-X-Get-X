@@ -27,9 +27,7 @@ if (file_exists(BXGX_PLUGIN_PATH . '/vendor/autoload.php')) {
 
 // To check class exists
 if (class_exists('BXGX\App\Route')) {
-  $bxgx_app = BXGX\App\Route::hooks();
+  BXGX\App\Route::hooks();
 } else {
   wp_die(__('Buy X Get X Plugin is unable to find the Route class.'));
 }
-
-?>

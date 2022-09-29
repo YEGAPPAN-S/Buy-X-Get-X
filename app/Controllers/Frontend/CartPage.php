@@ -48,8 +48,8 @@ class CartPage
      * @return void
      */
     public function beforeCalculateTotals() {
-        self::setPrice();
-        self::updateQuantity();
+        $this->setPrice();
+        $this->updateQuantity();
     }
 
     /**
@@ -57,11 +57,9 @@ class CartPage
      * @return void
      */
     public function setPrice() {
-        $items = WC()->cart->get_cart();
-        foreach($items as $item) {
-            if (isset($item['free_product'])) {
-                $item[ 'data' ]->set_price( 0 );
-            }
+        foreach(WC()->cart->get_cart() as $free_item) {
+            if (!isset($free_item['free_product'])) continue;
+            $free_item[ 'data' ]->set_price( 0 );  
         }
     }
 
@@ -71,24 +69,11 @@ class CartPage
      * @return void
      */
     public function updateQuantity() {
-        $items = WC()->cart->get_cart();
-        foreach($items as $item) {
-            $item_id = $item['product_id'];
-            $product_data = get_post_meta($item_id, "is_buy_get_enabled", true );
-            if ($product_data == "yes" ) {
-                if(!isset($item['free_product'])) {
-                    $item_quantity = $item['quantity'];
-                    $current_product_key = $item['key'];
-                }
-                if(isset($item['free_product'])) {
-                    foreach ($items as $get_item) {
-                        $free_item_quantity = $get_item['quantity'];
-                        if (isset($get_item['parent_key']) && $get_item['parent_key'] == $current_product_key) {
-                            if($item_quantity != $free_item_quantity){
-                                WC()->cart->set_quantity( $item['key'], $item_quantity, true);
-                            }
-                        }
-                    }
+        foreach(WC()->cart->get_cart() as $free_item) {
+            if(!isset($free_item['free_product'])) continue;
+            foreach (WC()->cart->get_cart() as $parent_item) {
+                if ($free_item['parent_key'] == $parent_item['key'] && $free_item['quantity'] != $parent_item['quantity']) {
+                    WC()->cart->set_quantity($free_item['key'], $parent_item['quantity'], true);
                 }
             }
         }
@@ -99,8 +84,8 @@ class CartPage
      * @return void
      */
     public function afterCalculateTotals() {
-        self::addProduct();
-        self::removeProduct();
+        $this->addProduct();
+        $this->removeProduct();
     }
 
     /**
@@ -109,29 +94,21 @@ class CartPage
      * @throws Exception
      */
     public function addProduct() {
-        $items = WC()->cart->get_cart();
-        foreach($items as $item) {
-            if (isset($item['free_product'])) {
-                continue;
-            }
-            $item_id = $item['product_id'];
-            $product_data = get_post_meta($item_id, "is_buy_get_enabled", true );
+        foreach(WC()->cart->get_cart() as $item) {
+            if (isset($item['free_product'])) continue;
+            $product_data = get_post_meta($item['product_id'], "is_buy_get_enabled", true );
             if ($product_data == "yes") {
-                $current_product_key = $item['key'];
-                foreach($items as $get_item) {
-                    if(isset($get_item['parent_key']) && $get_item['parent_key'] == $current_product_key) {
-                        continue 2;
-                    }
+                foreach(WC()->cart->get_cart() as $get_item) {
+                    if(isset($get_item['parent_key']) && $get_item['parent_key'] == $item['key']) continue 2;
                 }
-                $item_quantity=$item['quantity'];
                 WC()->cart->add_to_cart(
-                    $item_id,
-                    $item_quantity,
+                    $item['product_id'],
+                    $item['quantity'],
                     0,
                     array(),
                     array(
                         'free_product'  => true,
-                        'parent_key'    => $current_product_key
+                        'parent_key'    => $item['key']
                     )
                 );
             }
@@ -144,25 +121,13 @@ class CartPage
      * @return void
      */
     public function removeProduct() {
-        $items = WC()->cart->get_cart();
-        foreach($items as $item) {
-            if (isset($item['free_product']) && $item['free_product'] == true) {
-                if(isset($item['parent_key'])) {
-                    $parent_key = $item['parent_key'];
-                    $child_key = $item['key'];
-                    $item_id = $item['product_id'];
-                    $product_data = get_post_meta($item_id, "is_buy_get_enabled", true );
-                    if ($product_data == "yes") {
-                        foreach($items as $remove_item) {
-                            if($remove_item['key'] == $parent_key) {
-                                continue 2;
-                            }
-                        }
-                    }
-                    WC()->cart->remove_cart_item($child_key);
+        foreach(WC()->cart->get_cart() as $item) {
+            if (isset($item['free_product'])) {
+                foreach(WC()->cart->get_cart() as $remove_item) {
+                    if($remove_item['key'] == $item['parent_key']) continue 2;
                 }
+                WC()->cart->remove_cart_item($item['key']);
             }
         }
     }
 }
-?>
